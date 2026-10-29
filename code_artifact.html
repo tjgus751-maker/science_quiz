@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오감 탐험대: 감각 기관 보물 탐험</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts (Jua & Noto Sans KR) -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        islandEye: '#0284C7',
+                        islandEar: '#7C3AED',
+                        islandNose: '#EA580C',
+                        islandTongue: '#DB2777',
+                        islandSkin: '#059669',
+                    },
+                    fontFamily: {
+                        jua: ['Jua', 'sans-serif'],
+                        noto: ['Noto Sans KR', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        .title-font {
+            font-family: 'Jua', sans-serif;
+        }
+        
+        /* Map Animations & Effects */
+        .map-bg {
+            background: radial-gradient(circle at center, #1e3a8a 0%, #0f172a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .map-island-btn {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .map-island-btn:hover {
+            transform: scale(1.1) translateY(-6px);
+        }
+
+        .pulse-ring {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+            animation: pulse 1.8s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        .bounce-ui {
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .glow-card {
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.2);
+        }
+
+        /* Custom Drag & Sort styling for Boss Level */
+        .drag-item {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+        .drag-item:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body class="flex flex-col justify-between selection:bg-amber-400 selection:text-slate-900">
+
+    <!-- 글로벌 헤더 (상단 상태창) -->
+    <header class="bg-slate-900/90 border-b border-slate-700 backdrop-blur-md sticky top-0 z-40 shadow-xl">
+        <div class="max-w-5xl mx-auto px-4 py-2.5 flex justify-between items-center">
+            
+            <!-- 타이틀 및 캐릭터 레벨 -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="showScreen('map-screen')">
+                <div class="w-10 h-10 rounded-2xl bg-amber-400 text-slate-900 flex items-center justify-center font-bold text-xl shadow-lg border-2 border-amber-200">
+                    <i class="fa-solid fa-compass text-slate-900"></i>
+                </div>
+                <div>
+                    <h1 class="title-font text-xl md:text-2xl text-amber-300 leading-none">오감 탐험대</h1>
+                    <p class="text-xs text-slate-400 font-medium mt-0.5">보물지도 탐험 모드</p>
+                </div>
+            </div>
+
+            <!-- 상태 정보 (체력, 골드, 도감) -->
+            <div class="flex items-center gap-3 md:gap-5 text-sm">
+                <!-- 에너지/체력 -->
+                <div class="flex items-center gap-1.5 bg-slate-800/90 px-3 py-1.5 rounded-full border border-slate-700">
+                    <i class="fa-solid fa-bolt text-amber-400 text-base"></i>
+                    <span id="player-hp" class="font-extrabold text-amber-400">100</span>
+                    <span class="text-xs text-slate-500">HP</span>
+                </div>
+
+                <!-- 탐험 점수 -->
+                <div class="flex items-center gap-1.5 bg-slate-800/90 px-3 py-1.5 rounded-full border border-slate-700">
+                    <i class="fa-solid fa-coins text-yellow-400 text-base"></i>
+                    <span id="player-score" class="font-extrabold text-yellow-300">0</span>
+                </div>
+
+                <!-- 탐험 여권 (도감) 버튼 -->
+                <button onclick="togglePassportModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-full font-bold title-font text-xs md:text-sm flex items-center gap-1.5 transition shadow-md border border-indigo-400">
+                    <i class="fa-solid fa-passport text-amber-300"></i>
+                    <span>탐험 여권</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 탐험 영역 -->
+    <main class="max-w-4xl mx-auto w-full p-4 flex-grow flex flex-col justify-center my-2">
+
+        <!-- ================= 1. 보물지도 메인 화면 (MAP SCREEN) ================= -->
+        <section id="map-screen" class="space-y-6">
+            
+            <!-- 탐험가 가이드 메세지 -->
+            <div class="bg-slate-800/80 border-2 border-amber-500/40 rounded-3xl p-4 md:p-5 flex items-center gap-4 shadow-2xl relative overflow-hidden backdrop-blur-sm">
+                <div class="w-16 h-16 rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center text-3xl text-amber-300 shrink-0 bounce-ui">
+                    <i class="fa-solid fa-user-astronaut"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="bg-amber-400 text-slate-900 title-font text-xs px-2.5 py-0.5 rounded-full font-bold">대장 탐험가 제이</span>
+                        <span class="text-xs text-slate-400">"5개의 자극 섬을 정복하라!"</span>
+                    </div>
+                    <p id="guide-speech" class="text-slate-200 text-sm md:text-base mt-1 leading-snug">
+                        환영하네! 우리 몸의 감각 기관 비밀을 간직한 5개의 섬이 보이게나. 순서대로 섬을 탐험하고 보물 스탬프를 모아보게!
+                    </p>
+                </div>
+            </div>
+
+            <!-- 대탐험 보물 지도 (인터랙티브 스테이지 맵) -->
+            <div class="map-bg rounded-3xl p-6 md:p-10 border-4 border-slate-700 shadow-2xl relative min-h-[460px] flex flex-col justify-between">
+                
+                <!-- 나침반 & 장식 배경 -->
+                <div class="absolute top-4 right-4 text-slate-700/30 text-8xl pointer-events-none">
+                    <i class="fa-solid fa-compass"></i>
+                </div>
+
+                <!-- 섬들을 잇는 점선 항로 (SVG 연결선) -->
+                <svg class="absolute inset-0 w-full h-full pointer-events-none stroke-amber-400/30" stroke-width="4" stroke-dasharray="8 8">
+                    <path d="M 120 380 Q 220 280 320 350 T 520 220 T 700 120" fill="none" id="map-path"/>
+                </svg>
+
+                <div class="relative z-10 grid grid-cols-1 md:grid-cols-5 gap-6 items-center my-auto">
+
+                    <!-- 섬 1: 눈의 섬 -->
+                    <div id="node-eye" onclick="openStageDialog('eye')" class="map-island-btn cursor-pointer flex flex-col items-center group">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-sky-600 to-blue-400 border-4 border-sky-300 flex items-center justify-center text-3xl shadow-xl group-hover:border-amber-300 pulse-ring">
+                                <i class="fa-solid fa-eye text-white"></i>
+                            </div>
+                            <span id="star-eye" class="absolute -top-2 -right-2 bg-amber-400 text-slate-900 text-xs px-2 py-0.5 rounded-full font-bold shadow">
+                                <i class="fa-solid fa-star"></i> 도전 가능
+                            </span>
+                        </div>
+                        <h3 class="title-font text-lg text-sky-200 mt-2">1. 눈의 섬</h3>
+                        <p class="text-[11px] text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700">시각의 비밀</p>
+                    </div>
+
+                    <!-- 섬 2: 귀의 계곡 -->
+                    <div id="node-ear" onclick="openStageDialog('ear')" class="map-island-btn cursor-pointer flex flex-col items-center group opacity-50 pointer-events-none">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-purple-700 to-indigo-500 border-4 border-purple-300 flex items-center justify-center text-3xl shadow-xl group-hover:border-amber-300">
+                                <i class="fa-solid fa-ear-listen text-white"></i>
+                            </div>
+                            <span id="star-ear" class="absolute -top-2 -right-2 bg-slate-700 text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                        </div>
+                        <h3 class="title-font text-lg text-purple-200 mt-2">2. 귀의 계곡</h3>
+                        <p class="text-[11px] text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700">청각·평형</p>
+                    </div>
+
+                    <!-- 섬 3: 코의 동굴 -->
+                    <div id="node-nose" onclick="openStageDialog('nose')" class="map-island-btn cursor-pointer flex flex-col items-center group opacity-50 pointer-events-none">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-orange-600 to-amber-500 border-4 border-orange-300 flex items-center justify-center text-3xl shadow-xl group-hover:border-amber-300">
+                                <i class="fa-solid fa-wind text-white"></i>
+                            </div>
+                            <span id="star-nose" class="absolute -top-2 -right-2 bg-slate-700 text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                        </div>
+                        <h3 class="title-font text-lg text-orange-200 mt-2">3. 코의 동굴</h3>
+                        <p class="text-[11px] text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700">후각의 조각</p>
+                    </div>
+
+                    <!-- 섬 4: 혀의 파라다이스 -->
+                    <div id="node-tongue" onclick="openStageDialog('tongue')" class="map-island-btn cursor-pointer flex flex-col items-center group opacity-50 pointer-events-none">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-pink-600 to-rose-400 border-4 border-pink-300 flex items-center justify-center text-3xl shadow-xl group-hover:border-amber-300">
+                                <i class="fa-solid fa-utensils text-white"></i>
+                            </div>
+                            <span id="star-tongue" class="absolute -top-2 -right-2 bg-slate-700 text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                        </div>
+                        <h3 class="title-font text-lg text-pink-200 mt-2">4. 혀의 낙원</h3>
+                        <p class="text-[11px] text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700">미각 오아시스</p>
+                    </div>
+
+                    <!-- 섬 5: 피부의 왕국 -->
+                    <div id="node-skin" onclick="openStageDialog('skin')" class="map-island-btn cursor-pointer flex flex-col items-center group opacity-50 pointer-events-none">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-400 border-4 border-emerald-300 flex items-center justify-center text-3xl shadow-xl group-hover:border-amber-300">
+                                <i class="fa-solid fa-hand-pointer text-white"></i>
+                            </div>
+                            <span id="star-skin" class="absolute -top-2 -right-2 bg-slate-700 text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                        </div>
+                        <h3 class="title-font text-lg text-emerald-200 mt-2">5. 피부 요새</h3>
+                        <p class="text-[11px] text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700">촉각 파수꾼</p>
+                    </div>
+
+                </div>
+
+                <!-- 탐험 진행 상황 바 -->
+                <div class="relative z-10 bg-slate-900/80 rounded-2xl p-3 border border-slate-700 flex justify-between items-center text-xs">
+                    <span class="text-slate-300 flex items-center gap-1">
+                        <i class="fa-solid fa-flag-checkered text-amber-400"></i> 총 탐험 정복도:
+                    </span>
+                    <div class="w-1/2 bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+                        <div id="total-progress-bar" class="bg-gradient-to-r from-amber-400 to-emerald-400 h-full w-0 transition-all duration-500"></div>
+                    </div>
+                    <span id="total-progress-text" class="title-font text-amber-300">0%</span>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= 2. 스테이지 입장 팝업 대화창 ================= -->
+        <div id="stage-dialog-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border-2 border-amber-500/50 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl relative">
+                
+                <button onclick="closeStageDialog()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="flex items-center gap-4">
+                    <div id="stage-dialog-icon" class="w-16 h-16 rounded-2xl bg-blue-600 text-white text-3xl flex items-center justify-center border-2 border-amber-300 shrink-0">
+                        <i class="fa-solid fa-eye"></i>
+                    </div>
+                    <div>
+                        <span id="stage-dialog-badge" class="bg-sky-900 text-sky-200 text-xs font-bold px-2.5 py-0.5 rounded-full border border-sky-700">1번 탐험지</span>
+                        <h3 id="stage-dialog-title" class="title-font text-2xl text-amber-300 mt-1">눈의 섬 탐험</h3>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 space-y-2 text-sm text-slate-300">
+                    <p id="stage-dialog-desc">
+                        시각 자극을 받아들이는 '눈'의 세부 명칭과 빛의 경로를 탐사하는 미션입니다. 준비되었나요?
+                    </p>
+                    <div class="pt-2 border-t border-slate-700/60 flex justify-between text-xs text-amber-400">
+                        <span><i class="fa-solid fa-layer-group mr-1"></i> 총 3개 퀘스트</span>
+                        <span><i class="fa-solid fa-crown mr-1"></i> 자극 경로 보스전 포함</span>
+                    </div>
+                </div>
+
+                <button onclick="startSelectedStage()" class="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold title-font text-lg rounded-2xl shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i> 탐험 시작하기!
+                </button>
+            </div>
+        </div>
+
+
+        <!-- ================= 3. 퀘스트 인터랙티브 화면 (QUEST SCREEN) ================= -->
+        <section id="quest-screen" class="hidden space-y-5">
+            
+            <!-- 상단 퀘스트 프로그레스 -->
+            <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-700 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span id="quest-organ-tag" class="bg-sky-600 text-white text-xs title-font px-3 py-1 rounded-full">눈의 섬</span>
+                    <span class="text-sm font-bold text-slate-300">퀘스트 <span id="quest-step" class="text-amber-400">1</span>/3</span>
+                </div>
+                <!-- 콤보 디스플레이 -->
+                <div class="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                    <i class="fa-solid fa-fire text-amber-500"></i>
+                    <span class="text-xs font-bold text-slate-300">연속 탐험: <span id="combo-display" class="text-amber-400">0</span>회</span>
+                </div>
+            </div>
+
+            <!-- 메인 퀘스트 패널 -->
+            <div class="bg-slate-900 border-2 border-slate-700 rounded-3xl p-5 md:p-7 shadow-2xl space-y-6">
+                
+                <!-- 퀘스트 설명 헤더 -->
+                <div>
+                    <span id="quest-type-label" class="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-1">탐험 퀘스트 #1: 구조 명칭 암호</span>
+                    <h3 id="quest-question" class="title-font text-xl md:text-2xl text-slate-100 leading-snug">
+                        질문이 이곳에 표시됩니다.
+                    </h3>
+                </div>
+
+                <!-- 퀘스트 콘텐츠 (SVG 그래픽 & 문제 영역) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    
+                    <!-- SVG 다이어그램 탐사 창 -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center min-h-[240px] relative">
+                        <span class="absolute top-3 left-3 text-[11px] font-bold text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
+                            <i class="fa-solid fa-microscope text-amber-400 mr-1"></i>구조 스캔
+                        </span>
+                        
+                        <div id="quest-svg-box" class="w-full max-w-[260px] h-[200px] flex items-center justify-center">
+                            <!-- SVG 자바스크립트 주입 -->
+                        </div>
+                    </div>
+
+                    <!-- 문제 유형별 작업 영역 (일반 4지선다 OR 자극의 경로 순서맞추기) -->
+                    <div id="quest-action-box" class="space-y-3">
+                        <!-- JS에서 동적 생성 -->
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= 4. 탐험 피드백 모달 (정답/오답 해설) ================= -->
+        <div id="feedback-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+            <div id="feedback-card" class="bg-slate-900 border-4 border-amber-400 rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+                
+                <div id="feedback-icon" class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border-2 border-emerald-400 text-3xl flex items-center justify-center mx-auto">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+
+                <h3 id="feedback-title" class="title-font text-2xl text-emerald-400">보물 암호 해독 성공!</h3>
+
+                <div class="bg-slate-800/90 rounded-2xl p-4 text-left border border-slate-700 space-y-1.5 text-sm">
+                    <p class="text-xs text-amber-400 font-bold uppercase">탐험 도감 기록</p>
+                    <p id="feedback-target" class="title-font text-lg text-slate-100">홍채 (Iris)</p>
+                    <p id="feedback-desc" class="text-slate-300 leading-relaxed text-xs md:text-sm">
+                        빛의 양을 조절하여 눈을 보호하고 상을 또렷하게 맺히게 돕습니다.
+                    </p>
+                </div>
+
+                <button onclick="nextQuestStep()" class="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold title-font text-lg rounded-xl shadow-lg transition">
+                    다음 퀘스트로 이동 <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+
+            </div>
+        </div>
+
+
+        <!-- ================= 5. 탐험 여권 및 도감 모달 (PASSPORT) ================= -->
+        <div id="passport-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border-2 border-indigo-500/50 rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+                
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-amber-300 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-passport"></i>
+                        </div>
+                        <div>
+                            <h3 class="title-font text-2xl text-indigo-200">오감 탐험대 여권</h3>
+                            <p class="text-xs text-slate-400">수집한 감각 기관 스탬프 및 핵심 요약 노트</p>
+                        </div>
+                    </div>
+                    <button onclick="togglePassportModal()" class="text-slate-400 hover:text-white text-2xl">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- 스탬프 도감 목록 -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3" id="passport-stamps-grid">
+                    <!-- JS에서 동적 도장 생성 -->
+                </div>
+
+                <!-- 감각 기관 핵심 요약 노트 -->
+                <div class="space-y-3 pt-2">
+                    <h4 class="title-font text-lg text-amber-300 flex items-center gap-2">
+                        <i class="fa-solid fa-book-bookmark"></i> 과학 시험 대비 핵심 노트
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="passport-notes-container">
+                        <!-- JS 생성 -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- ================= 6. 오감 마스터 탐험가 자격증 화면 (CERTIFICATE) ================= -->
+        <section id="cert-screen" class="hidden space-y-6 text-center">
+            <div class="bg-gradient-to-b from-slate-900 to-indigo-950 rounded-3xl p-6 md:p-10 border-4 border-amber-400 shadow-2xl relative space-y-6 glow-card">
+                
+                <div class="inline-block bg-amber-400 text-slate-950 title-font px-4 py-1 rounded-full text-sm font-bold">
+                    🏆 최종 탐험 완료
+                </div>
+
+                <h2 class="title-font text-3xl md:text-5xl text-amber-300">오감 마스터 탐험가 자격증</h2>
+                <p class="text-slate-300 text-sm md:text-base max-w-lg mx-auto">
+                    위 탐험가는 중학교 3학년 과학 '자극과 반응' 단원의 5대 감각 기관 관문을 모두 정복하였음을 증명합니다.
+                </p>
+
+                <div class="bg-slate-900/80 rounded-2xl p-5 border border-amber-500/30 grid grid-cols-3 gap-4 max-w-md mx-auto">
+                    <div>
+                        <p class="text-xs text-slate-400">최종 점수</p>
+                        <p id="cert-score" class="title-font text-2xl text-amber-400">0점</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">수집한 스탬프</p>
+                        <p class="title-font text-2xl text-emerald-400">5 / 5 개</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">최대 콤보</p>
+                        <p id="cert-combo" class="title-font text-2xl text-sky-400">0회</p>
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-center gap-4">
+                    <button onclick="togglePassportModal()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold title-font rounded-xl shadow-lg transition flex items-center gap-2">
+                        <i class="fa-solid fa-passport"></i> 탐험 여권 확인
+                    </button>
+                    <button onclick="resetGame()" class="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold title-font rounded-xl shadow-lg transition flex items-center gap-2">
+                        <i class="fa-solid fa-rotate-right"></i> 다시 탐험하기
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 글로벌 푸터 -->
+    <footer class="bg-slate-950 py-3 text-center text-xs text-slate-500 border-t border-slate-800">
+        중학교 3학년 과학 보충학습 콘텐츠 — 오감 탐험대
+    </footer>
+
+
+    <!-- ==========================================
+         자바스크립트 엔진 및 게임 데이터
+    ========================================== -->
+    <script>
+        // --- 1. 감각 기관 탐험 데이터 베이스 ---
+        const stageData = {
+            eye: {
+                id: 'eye',
+                name: '눈의 섬',
+                subtitle: '시각의 비밀',
+                color: 'sky',
+                icon: 'fa-eye',
+                quests: [
+                    {
+                        type: 'choice',
+                        title: '눈의 구조 탐사 Q1',
+                        question: '빛의 양을 조절하는 조리개 역할을 하며, 눈의 색깔을 결정하는 부위는 무엇일까요?',
+                        options: ['홍채', '수정체', '망막', '각막'],
+                        answer: '홍채',
+                        explanation: '밝은 곳에서는 홍채가 확장되어 동공이 작아지고, 어두운 곳에서는 수축하여 동공이 커집니다.',
+                        highlight: 'iris'
+                    },
+                    {
+                        type: 'choice',
+                        title: '눈의 구조 탐사 Q2',
+                        question: '안구 가장 안쪽의 막으로, 빛 자극을 받아들이는 시각 세포가 모여 있는 스크린은?',
+                        options: ['공막', '맥락막', '망막', '시각 신경'],
+                        answer: '망막',
+                        explanation: '망막에는 빛을 감지하는 시각 세포가 있어 물체의 상이 맺힙니다.',
+                        highlight: 'retina'
+                    },
+                    {
+                        type: 'pathBoss',
+                        title: '⚔️ 보스전: 시각 자극의 전달 경로',
+                        question: '빛 자극이 전달되는 올바른 경로 순서대로 카드를 터치해 연결하세요!',
+                        correctPath: ['빛', '각막', '수정체', '망막', '시각 신경', '대뇌'],
+                        explanation: '빛 → 각막 → 수정체 → 유리체 → 망막(시각세포) → 시각 신경 → 대뇌 순으로 전달됩니다.'
+                    }
+                ]
+            },
+
+            ear: {
+                id: 'ear',
+                name: '귀의 계곡',
+                subtitle: '청각과 평형 감각',
+                color: 'purple',
+                icon: 'fa-ear-listen',
+                quests: [
+                    {
+                        type: 'choice',
+                        title: '귀의 구조 탐사 Q1',
+                        question: '소리의 진동을 받아 가장 먼저 떨리는 얇은 막은 무엇일까요?',
+                        options: ['귓속뼈', '고막', '달팽이관', '반규관'],
+                        answer: '고막',
+                        explanation: '고막은 공기의 진동을 받아 떨리는 얇은 막입니다.',
+                        highlight: 'eardrum'
+                    },
+                    {
+                        type: 'choice',
+                        title: '귀의 구조 탐사 Q2',
+                        question: '몸의 회전 감각(움직임)을 감지하는 3개의 고리 모양 기관은?',
+                        options: ['전정 기관', '반규관', '달팽이관', '유스타키오관'],
+                        answer: '반규관',
+                        explanation: '반규관은 몸의 회전을 감지하고, 전정 기관은 기울임(위치)을 감지합니다.',
+                        highlight: 'semicircular'
+                    },
+                    {
+                        type: 'pathBoss',
+                        title: '⚔️ 보스전: 청각 자극의 전달 경로',
+                        question: '소리 자극이 뇌로 전달되는 올바른 경로를 순서대로 완성하세요!',
+                        correctPath: ['소리', '고막', '귓속뼈', '달팽이관', '청각 신경', '대뇌'],
+                        explanation: '소리 → 외이도 → 고막 → 귓속뼈(증폭) → 달팽이관(청각세포) → 청각 신경 → 대뇌 순서입니다.'
+                    }
+                ]
+            },
+
+            nose: {
+                id: 'nose',
+                name: '코의 동굴',
+                subtitle: '후각의 조각',
+                color: 'orange',
+                icon: 'fa-wind',
+                quests: [
+                    {
+                        type: 'choice',
+                        title: '코의 구조 탐사 Q1',
+                        question: '콧속 윗부분 후각 상피에서 기체 상태의 화학 물질을 자극으로 받아들이는 세포는?',
+                        options: ['후각 세포', '맛봉우리', '감각점', '시각 세포'],
+                        answer: '후각 세포',
+                        explanation: '후각 세포는 기체 상태 물질을 자극으로 받아들이며 매우 예민하지만 쉽게 피로해집니다.',
+                        highlight: 'olfactory'
+                    },
+                    {
+                        type: 'pathBoss',
+                        title: '⚔️ 보스전: 후각 자극의 전달 경로',
+                        question: '냄새 자극이 뇌로 전달되는 순서를 완성하세요!',
+                        correctPath: ['기체 물질', '후각 상피', '후각 세포', '후각 신경', '대뇌'],
+                        explanation: '기체 상태 화학 물질 → 후각 상피(후각 세포) → 후각 신경 → 대뇌로 전달됩니다.'
+                    }
+                ]
+            },
+
+            tongue: {
+                id: 'tongue',
+                name: '혀의 낙원',
+                subtitle: '미각 오아시스',
+                color: 'pink',
+                icon: 'fa-utensils',
+                quests: [
+                    {
+                        type: 'choice',
+                        title: '혀의 구조 탐사 Q1',
+                        question: '혀 표면의 돌기 측면에 위치하며 액체 상태 물질을 감지하는 미각 세포 모음은?',
+                        options: ['맛봉우리(미뢰)', '후각 세포', '통각점', '침샘'],
+                        answer: '맛봉우리(미뢰)',
+                        explanation: '맛봉우리 속 미각 세포가 침에 녹은 액체 상태 화학 물질을 자극으로 받아들입니다.',
+                        highlight: 'tastebud'
+                    },
+                    {
+                        type: 'pathBoss',
+                        title: '⚔️ 보스전: 미각 자극의 전달 경로',
+                        question: '맛 자극이 전달되는 올바른 경로를 완성하세요!',
+                        correctPath: ['액체 물질', '맛봉우리', '미각 세포', '미각 신경', '대뇌'],
+                        explanation: '액체 상태 화학 물질 → 맛봉우리(미각 세포) → 미각 신경 → 대뇌 순서입니다.'
+                    }
+                ]
+            },
+
+            skin: {
+                id: 'skin',
+                name: '피부 요새',
+                subtitle: '촉각 파수꾼',
+                color: 'emerald',
+                icon: 'fa-hand-pointer',
+                quests: [
+                    {
+                        type: 'choice',
+                        title: '피부 감각 탐사 Q1',
+                        question: '피부 감각점 중 가장 많이 분포하며 몸을 보호하기 위해 통증을 감지하는 곳은?',
+                        options: ['통각점', '압각점', '촉각점', '냉각점'],
+                        answer: '통각점',
+                        explanation: '통각점은 가장 많은 수가 분포하여 신체 위험을 경고합니다.',
+                        highlight: 'painpoint'
+                    },
+                    {
+                        type: 'pathBoss',
+                        title: '⚔️ 보스전: 피부 자극의 전달 경로',
+                        question: '피부 자극이 전달되는 올바른 순서를 완성하세요!',
+                        correctPath: ['피부 자극', '감각점', '피부 감각 신경', '척수/대뇌'],
+                        explanation: '피부 자극 → 감각점 → 피부 감각 신경 → 척수 및 대뇌로 전달됩니다.'
+                    }
+                ]
+            }
+        };
+
+        // --- 2. 게임 플레이 상태 변수 ---
+        let playerState = {
+            hp: 100,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            unlockedStages: ['eye'],
+            completedStages: {},
+            currentStageKey: null,
+            currentQuestIndex: 0,
+            bossUserPath: []
+        };
+
+        // --- 3. 스테이지 및 퀘스트 제어 ---
+        function openStageDialog(stageKey) {
+            const data = stageData[stageKey];
+            playerState.currentStageKey = stageKey;
+
+            document.getElementById('stage-dialog-badge').innerText = data.name;
+            document.getElementById('stage-dialog-title').innerText = `${data.name} 탐험`;
+            document.getElementById('stage-dialog-desc').innerText = `${data.subtitle}의 비밀을 파헤치고 자극 경로 보스전을 정복하세요!`;
+            
+            const iconBox = document.getElementById('stage-dialog-icon');
+            iconBox.innerHTML = `<i class="fa-solid ${data.icon}"></i>`;
+
+            document.getElementById('stage-dialog-modal').classList.remove('hidden');
+        }
+
+        function closeStageDialog() {
+            document.getElementById('stage-dialog-modal').classList.add('hidden');
+        }
+
+        function startSelectedStage() {
+            closeStageDialog();
+            playerState.currentQuestIndex = 0;
+            showScreen('quest-screen');
+            loadQuestStep();
+        }
+
+        function loadQuestStep() {
+            const stage = stageData[playerState.currentStageKey];
+            const quest = stage.quests[playerState.currentQuestIndex];
+
+            // UI 태그 업데이트
+            document.getElementById('quest-organ-tag').innerText = stage.name;
+            document.getElementById('quest-step').innerText = playerState.currentQuestIndex + 1;
+            document.getElementById('combo-display').innerText = playerState.combo;
+            document.getElementById('quest-type-label').innerText = quest.title;
+            document.getElementById('quest-question').innerText = quest.question;
+
+            // SVG 다이어그램 그리기
+            renderSVG(stage.id, quest.highlight || null);
+
+            const actionBox = document.getElementById('quest-action-box');
+            actionBox.innerHTML = '';
+
+            // [퀘스트 유형 1: 4지선다형]
+            if (quest.type === 'choice') {
+                quest.options.forEach((opt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = `w-full text-left p-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-amber-400 font-semibold text-slate-200 transition flex items-center justify-between group`;
+                    btn.onclick = () => handleChoiceAnswer(opt, quest);
+                    btn.innerHTML = `
+                        <span><span class="inline-block w-6 h-6 rounded-full bg-slate-700 text-amber-400 text-xs text-center leading-6 mr-2 group-hover:bg-amber-400 group-hover:text-slate-900 font-bold">${idx + 1}</span> ${opt}</span>
+                        <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-amber-400"></i>
+                    `;
+                    actionBox.appendChild(btn);
+                });
+            } 
+            // [퀘스트 유형 2: 자극의 경로 보스전]
+            else if (quest.type === 'pathBoss') {
+                playerState.bossUserPath = [];
+
+                const bossContainer = document.createElement('div');
+                bossContainer.className = 'space-y-4';
+
+                // 선택된 경로 표시 창
+                const pathSlotBox = document.createElement('div');
+                pathSlotBox.id = 'boss-slot-box';
+                pathSlotBox.className = 'bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-wrap gap-1.5 min-h-[50px] items-center text-xs font-bold text-amber-300';
+                pathSlotBox.innerHTML = '<span class="text-slate-500 font-normal">아래 카드를 순서대로 클릭하세요:</span>';
+                bossContainer.appendChild(pathSlotBox);
+
+                // 선택 가능한 카드 모음 (무작위 섞기)
+                const cardPool = [...quest.correctPath].sort(() => Math.random() - 0.5);
+                const cardsBox = document.createElement('div');
+                cardsBox.id = 'boss-cards-box';
+                cardsBox.className = 'grid grid-cols-3 gap-2';
+
+                cardPool.forEach(item => {
+                    const card = document.createElement('button');
+                    card.className = `drag-item p-2.5 bg-indigo-900/60 border border-indigo-500/40 hover:border-amber-400 text-indigo-200 rounded-xl text-xs font-bold shadow`;
+                    card.innerText = item;
+                    card.onclick = () => selectBossPathCard(item, card, quest);
+                    cardsBox.appendChild(card);
+                });
+
+                bossContainer.appendChild(cardsBox);
+
+                // 제출 버튼
+                const submitBtn = document.createElement('button');
+                submitBtn.className = 'w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold title-font rounded-xl shadow-md transition mt-2';
+                submitBtn.innerText = '⚔️ 자극 경로 완성 및 보스 공격!';
+                submitBtn.onclick = () => checkBossPathAnswer(quest);
+                bossContainer.appendChild(submitBtn);
+
+                actionBox.appendChild(bossContainer);
+            }
+        }
+
+        // --- 4. 정답 판정 및 보스전 로직 ---
+        function handleChoiceAnswer(selectedOpt, quest) {
+            const isCorrect = selectedOpt === quest.answer;
+            showFeedbackModal(isCorrect, quest.answer, quest.explanation);
+        }
+
+        function selectBossPathCard(item, btnElem, quest) {
+            playerState.bossUserPath.push(item);
+            btnElem.classList.add('opacity-30', 'pointer-events-none');
+
+            const slotBox = document.getElementById('boss-slot-box');
+            if (playerState.bossUserPath.length === 1) slotBox.innerHTML = '';
+
+            const badge = document.createElement('span');
+            badge.className = 'bg-amber-400 text-slate-950 px-2 py-1 rounded-md text-xs font-extrabold flex items-center gap-1';
+            badge.innerHTML = `${playerState.bossUserPath.length}. ${item}`;
+            slotBox.appendChild(badge);
+        }
+
+        function checkBossPathAnswer(quest) {
+            const userStr = playerState.bossUserPath.join('->');
+            const targetStr = quest.correctPath.join('->');
+            const isCorrect = userStr === targetStr;
+
+            showFeedbackModal(isCorrect, quest.correctPath.join(' ➔ '), quest.explanation);
+        }
+
+        function showFeedbackModal(isCorrect, targetTitle, desc) {
+            const modal = document.getElementById('feedback-modal');
+            const card = document.getElementById('feedback-card');
+            const icon = document.getElementById('feedback-icon');
+            const title = document.getElementById('feedback-title');
+
+            if (isCorrect) {
+                playerState.score += 30 + (playerState.combo * 10);
+                playerState.combo++;
+                if (playerState.combo > playerState.maxCombo) playerState.maxCombo = playerState.combo;
+
+                card.className = "bg-slate-900 border-4 border-emerald-400 rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl";
+                icon.className = "w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border-2 border-emerald-400 text-3xl flex items-center justify-center mx-auto";
+                icon.innerHTML = `<i class="fa-solid fa-check"></i>`;
+                title.innerText = "보물 암호 해독 성공! 🎉";
+                title.className = "title-font text-2xl text-emerald-400";
+
+                confetti({ particleCount: 35, spread: 50, origin: { y: 0.7 } });
+            } else {
+                playerState.hp = Math.max(0, playerState.hp - 15);
+                playerState.combo = 0;
+
+                card.className = "bg-slate-900 border-4 border-rose-500 rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl";
+                icon.className = "w-16 h-16 rounded-full bg-rose-500/20 text-rose-400 border-2 border-rose-400 text-3xl flex items-center justify-center mx-auto";
+                icon.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+                title.innerText = "탐험 실패! HP 감소!";
+                title.className = "title-font text-2xl text-rose-400";
+            }
+
+            updateHeaderUI();
+
+            document.getElementById('feedback-target').innerText = targetTitle;
+            document.getElementById('feedback-desc').innerText = desc;
+            modal.classList.remove('hidden');
+        }
+
+        function nextQuestStep() {
+            document.getElementById('feedback-modal').classList.add('hidden');
+            const stage = stageData[playerState.currentStageKey];
+            playerState.currentQuestIndex++;
+
+            if (playerState.currentQuestIndex < stage.quests.length) {
+                loadQuestStep();
+            } else {
+                // 스테이지 클리어 처리
+                completeStage(playerState.currentStageKey);
+            }
+        }
+
+        // --- 5. 스테이지 클리어 및 맵 잠금해제 ---
+        function completeStage(stageKey) {
+            playerState.completedStages[stageKey] = true;
+
+            // 다음 스테이지 해금 순서
+            const keys = ['eye', 'ear', 'nose', 'tongue', 'skin'];
+            const currIdx = keys.indexOf(stageKey);
+
+            if (currIdx < keys.length - 1) {
+                const nextKey = keys[currIdx + 1];
+                if (!playerState.unlockedStages.includes(nextKey)) {
+                    playerState.unlockedStages.push(nextKey);
+                }
+            }
+
+            updateMapUI();
+
+            // 모든 섬 클리어 시 자격증 화면
+            if (Object.keys(playerState.completedStages).length === 5) {
+                showCertificate();
+            } else {
+                showScreen('map-screen');
+            }
+        }
+
+        function showCertificate() {
+            showScreen('cert-screen');
+            document.getElementById('cert-score').innerText = `${playerState.score}점`;
+            document.getElementById('cert-combo').innerText = `${playerState.maxCombo}회`;
+
+            confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 } });
+        }
+
+        // --- 6. UI 및 맵 업데이트 ---
+        function updateHeaderUI() {
+            document.getElementById('player-hp').innerText = playerState.hp;
+            document.getElementById('player-score').innerText = playerState.score;
+        }
+
+        function updateMapUI() {
+            const keys = ['eye', 'ear', 'nose', 'tongue', 'skin'];
+            let completedCount = 0;
+
+            keys.forEach(key => {
+                const nodeElem = document.getElementById(`node-${key}`);
+                const starElem = document.getElementById(`star-${key}`);
+
+                if (playerState.unlockedStages.includes(key)) {
+                    nodeElem.classList.remove('opacity-50', 'pointer-events-none');
+                }
+
+                if (playerState.completedStages[key]) {
+                    completedCount++;
+                    starElem.innerHTML = `<i class="fa-solid fa-star text-yellow-300"></i> 클리어`;
+                    starElem.className = "absolute -top-2 -right-2 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow";
+                }
+            });
+
+            // 진척도
+            const progress = Math.round((completedCount / 5) * 100);
+            document.getElementById('total-progress-bar').style.width = `${progress}%`;
+            document.getElementById('total-progress-text').innerText = `${progress}%`;
+        }
+
+        function togglePassportModal() {
+            const modal = document.getElementById('passport-modal');
+            if (modal.classList.contains('hidden')) {
+                renderPassportData();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function renderPassportData() {
+            const stampsGrid = document.getElementById('passport-stamps-grid');
+            stampsGrid.innerHTML = '';
+
+            const keys = ['eye', 'ear', 'nose', 'tongue', 'skin'];
+            keys.forEach(key => {
+                const data = stageData[key];
+                const isCleared = playerState.completedStages[key];
+
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-2xl border text-center space-y-1 ${isCleared ? 'bg-indigo-950/80 border-amber-400' : 'bg-slate-800/40 border-slate-800 opacity-40'}`;
+                card.innerHTML = `
+                    <div class="w-10 h-10 rounded-full mx-auto flex items-center justify-center text-xl ${isCleared ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-500'}">
+                        <i class="fa-solid ${isCleared ? 'fa-stamp' : 'fa-lock'}"></i>
+                    </div>
+                    <p class="title-font text-xs text-slate-200 mt-1">${data.name}</p>
+                    <span class="text-[10px] ${isCleared ? 'text-amber-300 font-bold' : 'text-slate-500'}">${isCleared ? '스탬프 획득' : '미정복'}</span>
+                `;
+                stampsGrid.appendChild(card);
+            });
+
+            // 핵심 요약 노트
+            const notesContainer = document.getElementById('passport-notes-container');
+            notesContainer.innerHTML = `
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-xs space-y-1">
+                    <p class="font-bold text-sky-300">👁️ 눈 (시각)</p>
+                    <p class="text-slate-300">홍채(빛 양 조절) ➔ 수정체(굴절) ➔ 망막(시각세포) ➔ 시각신경 ➔ 대뇌</p>
+                </div>
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-xs space-y-1">
+                    <p class="font-bold text-purple-300">👂 귀 (청각·평형)</p>
+                    <p class="text-slate-300">고막 ➔ 귓속뼈(증폭) ➔ 달팽이관(청각) / 반규관(회전) / 전정기관(기울임)</p>
+                </div>
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-xs space-y-1">
+                    <p class="font-bold text-orange-300">👃 코 (후각)</p>
+                    <p class="text-slate-300">기체 상태 화학 물질 ➔ 후각 상피(후각 세포) ➔ 후각 신경 (가장 예민)</p>
+                </div>
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-xs space-y-1">
+                    <p class="font-bold text-pink-300">👅 혀 (미각)</p>
+                    <p class="text-slate-300">액체 상태 화학 물질 ➔ 맛봉우리(미각 세포) ➔ 미각 신경 (5가지 기본맛)</p>
+                </div>
+            `;
+        }
+
+        // --- 7. SVG 다이어그램 그리기 ---
+        function renderSVG(type, highlightId) {
+            const container = document.getElementById('quest-svg-box');
+            let svg = '';
+
+            if (type === 'eye') {
+                svg = `
+                <svg viewBox="0 0 200 150" class="w-full h-full">
+                    <circle cx="100" cy="75" r="55" fill="#1e293b" stroke="#475569" stroke-width="4"/>
+                    <path d="M 52,42 L 52,62 M 52,88 L 52,108" stroke="${highlightId === 'iris' ? '#f59e0b' : '#94a3b8'}" stroke-width="${highlightId === 'iris' ? '8' : '4'}" stroke-linecap="round"/>
+                    <ellipse cx="65" cy="75" rx="6" ry="20" fill="#38bdf8" opacity="0.8"/>
+                    <path d="M 60,25 A 50,50 0 1,1 60,125" fill="none" stroke="${highlightId === 'retina' ? '#f59e0b' : '#f43f5e'}" stroke-width="${highlightId === 'retina' ? '7' : '3'}"/>
+                    <path d="M 150,75 L 185,75" stroke="#fbbf24" stroke-width="8" stroke-linecap="round"/>
+                    <text x="100" y="145" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="bold">눈 단면 탐사도</text>
+                </svg>`;
+            } else if (type === 'ear') {
+                svg = `
+                <svg viewBox="0 0 200 150" class="w-full h-full">
+                    <path d="M 25,75 L 70,75" stroke="#fed7aa" stroke-width="12"/>
+                    <line x1="70" y1="63" x2="70" y2="87" stroke="${highlightId === 'eardrum' ? '#f59e0b' : '#94a3b8'}" stroke-width="${highlightId === 'eardrum' ? '7' : '3'}"/>
+                    <circle cx="110" cy="55" r="12" fill="none" stroke="${highlightId === 'semicircular' ? '#f59e0b' : '#a855f7'}" stroke-width="${highlightId === 'semicircular' ? '6' : '3'}"/>
+                    <path d="M 110,80 A 15,15 0 1,1 125,90" fill="none" stroke="#c084fc" stroke-width="5"/>
+                    <text x="100" y="145" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="bold">귀 단면 탐사도</text>
+                </svg>`;
+            } else if (type === 'nose') {
+                svg = `
+                <svg viewBox="0 0 200 150" class="w-full h-full">
+                    <path d="M 50,30 L 110,30 C 130,30 140,50 120,80 L 80,120" fill="none" stroke="#fdba74" stroke-width="6"/>
+                    <rect x="70" y="40" width="40" height="15" rx="5" fill="${highlightId === 'olfactory' ? '#f59e0b' : '#ea580c'}"/>
+                    <circle cx="55" cy="85" r="4" fill="#f97316"/>
+                    <text x="100" y="145" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="bold">코 후각 세포 영역</text>
+                </svg>`;
+            } else if (type === 'tongue') {
+                svg = `
+                <svg viewBox="0 0 200 150" class="w-full h-full">
+                    <path d="M 40,110 C 40,50 160,50 160,110 Z" fill="#f43f5e"/>
+                    <circle cx="100" cy="65" r="7" fill="${highlightId === 'tastebud' ? '#f59e0b' : '#fff'}"/>
+                    <text x="100" y="145" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="bold">혀 돌기 및 맛봉우리</text>
+                </svg>`;
+            } else if (type === 'skin') {
+                svg = `
+                <svg viewBox="0 0 200 150" class="w-full h-full">
+                    <rect x="30" y="30" width="140" height="20" fill="#fed7aa"/>
+                    <rect x="30" y="50" width="140" height="60" fill="#fca5a5" opacity="0.6"/>
+                    <circle cx="60" cy="70" r="6" fill="${highlightId === 'painpoint' ? '#f59e0b' : '#10b981'}"/>
+                    <text x="100" y="145" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="bold">피부 감각점 구조</text>
+                </svg>`;
+            }
+
+            container.innerHTML = svg;
+        }
+
+        // --- 8. 화면 전환 리셋 ---
+        function showScreen(screenId) {
+            document.getElementById('map-screen').classList.add('hidden');
+            document.getElementById('quest-screen').classList.add('hidden');
+            document.getElementById('cert-screen').classList.add('hidden');
+
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function resetGame() {
+            playerState = {
+                hp: 100,
+                score: 0,
+                combo: 0,
+                maxCombo: 0,
+                unlockedStages: ['eye'],
+                completedStages: {},
+                currentStageKey: null,
+                currentQuestIndex: 0,
+                bossUserPath: []
+            };
+
+            updateHeaderUI();
+            updateMapUI();
+            showScreen('map-screen');
+        }
+
+        // 초기화
+        window.onload = function() {
+            updateHeaderUI();
+            updateMapUI();
+            showScreen('map-screen');
+        };
+    </script>
+</body>
+</html>
